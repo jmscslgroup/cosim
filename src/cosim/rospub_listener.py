@@ -55,7 +55,14 @@ class rospub_listener(traci.StepListener):
         self.current_reatimefactor = 0.0
         self.delta_clock = None
         self.delta_sim = None
+
+        self.next_vel = 0.0
+
         super().__init__()
+
+    def set_speedcb(self, data):
+        self.next_vel = data.linear.x
+        
 
     def step(self, t):
         """
@@ -89,6 +96,7 @@ class rospub_listener(traci.StepListener):
         self.car_msg.x = x
         self.car_msg.y = y
         self.car_msg.speed = speed
+        self.car_pub.publish(self.car_msg)
 
         #print('tstep={}'.format(self.tstep))
         self.tstep += 1
@@ -107,6 +115,9 @@ class rospub_listener(traci.StepListener):
 
         self.rtf_msg.data = self.current_reatimefactor
         self.rtf_pub.publish(self.rtf_msg.data)
-        self.car_pub.publish(self.car_msg)
+
+        for vids in veh_ids:
+            traci.vehicle.setSpeed(vids, self.next_vel)
+        
 
         return True

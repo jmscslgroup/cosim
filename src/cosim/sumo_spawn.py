@@ -42,8 +42,14 @@ import matplotlib.pyplot as plt
 import random
 import rospkg, rostopic, roslaunch, rospy
 from std_msgs.msg import Float64
+from geometry_msgs.msg import Twist
 from cosim import rospub_listener
 
+# get an instance of RosPack with the default search paths
+rospack = rospkg.RosPack()
+package_path = rospack.get_path('cosim')
+assets = package_path + '/assets'
+        
 def get_intersection_net(dt):
     '''
     Function to create net xml and returns its path after creation
@@ -235,9 +241,73 @@ def get_intersection_net(dt):
 
     return net_xml
 
+def get_example_route(dt):
+    # Create a custom vehicle type
+    root = minidom.Document()
+    xml = root.createElement('routes')
+    root.appendChild(xml)
+    node_child = root.createElement('vType')
+    node_child.setAttribute('id', 'toyota')
+    node_child.setAttribute('accel', '0.5')
+    node_child.setAttribute('decel', '1.5')
+    node_child.setAttribute('apparentDecel', '1.5')
+    node_child.setAttribute('emergencyDecel', '9.0')
+    node_child.setAttribute('vClass', 'passenger')
+    node_child.setAttribute('guiShape', "passenger")
+    node_child.setAttribute('color', "1,0.5,0.1")
+    node_child.setAttribute('imgFile', str(assets) + "/toyota.png")
+    xml.appendChild(node_child)
+    xml_str = root.toprettyxml(indent ="\t")
+    routexml_file = "/tmp/tsmo_{}.rou.xml".format(dt)
+    with open(routexml_file, "w") as f:
+        f.write(xml_str)
 
+    return routexml_file
+
+def get_example_traffic_signal(dt):
+    # additional files
+    root = minidom.Document()
+    xml = root.createElement('additional')
+    root.appendChild(xml)
+    tlLogic = root.createElement('tlLogic')
+    tlLogic.setAttribute('id', '01')
+    tlLogic.setAttribute('type', 'static')
+    tlLogic.setAttribute('programID', '111')
+    tlLogic.setAttribute('offset', '0')
+
+    phase = root.createElement('phase')
+    phase.setAttribute('duration', '1200000')
+    phase.setAttribute('state', 'GGGggrrrrrGGGggrrrrr')
+    #phase.setAttribute('state', 'GgGgGrrrrrGgGgGrrrrr')
+    tlLogic.appendChild(phase)
+
+    phase = root.createElement('phase')
+    phase.setAttribute('duration', '600000')
+    phase.setAttribute('state', 'yyyyyrrrrryyyyyrrrrr')
+    tlLogic.appendChild(phase)
+
+    phase = root.createElement('phase')
+    phase.setAttribute('duration', '1200000')
+    phase.setAttribute('state', 'rrrrrGGGggrrrrrGGGgg')
+    #phase.setAttribute('state', 'rrrrrGgGgGrrrrrGgGgG')
+    tlLogic.appendChild(phase)
+
+    phase = root.createElement('phase')
+    phase.setAttribute('duration', '600000')
+    phase.setAttribute('state', 'rrrrryyyyyrrrrryyyyy')
+    tlLogic.appendChild(phase)
+
+    xml.appendChild(tlLogic)
+
+    xml_str = root.toprettyxml(indent ="\t")
+    print(xml_str)
+    tlLogicxml_file = "/tmp/tsmo_{}.add.xml".format(dt)
+    with open(tlLogicxml_file, "w") as f:
+        f.write(xml_str)
+
+    return tlLogicxml_file
 class sumo_spawn:
-    def __init__(self, ns='', n_vehicles=20, vehicle_separation=15, sim_step = 0.5, **kwargs):
+    def __init__(self, ns='', n_vehicles=20, vehicle_separation=15, sim_step = 0.05, **kwargs):
         # ROS Part
         self.ns = ns
         self.n_vehicles = n_vehicles
@@ -248,83 +318,18 @@ class sumo_spawn:
 
         dt_object = datetime.datetime.fromtimestamp(time.time())
         dt = dt_object.strftime('%Y-%m-%d-%H-%M-%S-%f')
-
-        # get an instance of RosPack with the default search paths
-        rospack = rospkg.RosPack()
-        package_path = rospack.get_path('cosim')
-
-        self.assets = package_path + '/assets'
+        
+        self.routexml_file = get_example_route(dt)
+        self.tlLogicxml_file = get_example_traffic_signal(dt)
+        self.net_xml = get_intersection_net(dt)
+        
+        self.assets = assets
         self.sumo_call.append("--gui-settings-file")
         self.sumo_call.append(str(self.assets) + "/tsmo_gui.xml")
-
-        # Create a custom vehicle type
-        root = minidom.Document()
-        xml = root.createElement('routes')
-        root.appendChild(xml)
-        node_child = root.createElement('vType')
-        node_child.setAttribute('id', 'toyota')
-        node_child.setAttribute('accel', '0.5')
-        node_child.setAttribute('decel', '1.5')
-        node_child.setAttribute('apparentDecel', '1.5')
-        node_child.setAttribute('emergencyDecel', '9.0')
-        node_child.setAttribute('vClass', 'passenger')
-        node_child.setAttribute('guiShape', "passenger")
-        node_child.setAttribute('color', "1,0.5,0.1")
-        node_child.setAttribute('imgFile', str(self.assets) + "/toyota.png")
-        xml.appendChild(node_child)
-        xml_str = root.toprettyxml(indent ="\t")
-
-        self.routexml_file = "/tmp/tsmo_{}.rou.xml".format(dt)
-        with open(self.routexml_file, "w") as f:
-            f.write(xml_str)
-
-        # additional files
-        root = minidom.Document()
-        xml = root.createElement('additional')
-        root.appendChild(xml)
-        tlLogic = root.createElement('tlLogic')
-        tlLogic.setAttribute('id', '01')
-        tlLogic.setAttribute('type', 'static')
-        tlLogic.setAttribute('programID', '111')
-        tlLogic.setAttribute('offset', '0')
-
-        phase = root.createElement('phase')
-        phase.setAttribute('duration', '1200000')
-        phase.setAttribute('state', 'GGGggrrrrrGGGggrrrrr')
-        #phase.setAttribute('state', 'GgGgGrrrrrGgGgGrrrrr')
-        tlLogic.appendChild(phase)
-
-        phase = root.createElement('phase')
-        phase.setAttribute('duration', '600000')
-        phase.setAttribute('state', 'yyyyyrrrrryyyyyrrrrr')
-        tlLogic.appendChild(phase)
-
-        phase = root.createElement('phase')
-        phase.setAttribute('duration', '1200000')
-        phase.setAttribute('state', 'rrrrrGGGggrrrrrGGGgg')
-        #phase.setAttribute('state', 'rrrrrGgGgGrrrrrGgGgG')
-        tlLogic.appendChild(phase)
-
-        phase = root.createElement('phase')
-        phase.setAttribute('duration', '600000')
-        phase.setAttribute('state', 'rrrrryyyyyrrrrryyyyy')
-        tlLogic.appendChild(phase)
-
-        xml.appendChild(tlLogic)
-
-        xml_str = root.toprettyxml(indent ="\t")
-        print(xml_str)
-        self.tlLogicxml_file = "/tmp/tsmo_{}.add.xml".format(dt)
-        with open(self.tlLogicxml_file, "w") as f:
-            f.write(xml_str)
-
-        self.net_xml = get_intersection_net(dt)
         self.sumo_call.append("--net-file")
         self.sumo_call.append(self.net_xml)
-
         self.sumo_call.append("--route-files")
         self.sumo_call.append(self.routexml_file)
-
         self.sumo_call.append("--additional-files")
         self.sumo_call.append(self.tlLogicxml_file)
 
@@ -333,10 +338,12 @@ class sumo_spawn:
         traci.route.add("trip_h", ["-12", "16"])
 
         for  i in range(0, self.n_vehicles):
-            traci.vehicle.add("newVeh{}".format(i), "trip_h", typeID="toyota", departPos='{:.3f}'.format(10+ i*self.n_vehicles_separation))
+            traci.vehicle.add("newVeh{}".format(i), "trip_h", typeID="toyota", departPos='{:.3f}'.format(200+ i*self.n_vehicles_separation))
+            traci.vehicle.setSpeedMode("newVeh{}".format(i), 0)
 
         r_listener = rospub_listener()
         traci.addStepListener(r_listener)
+        rospy.Subscriber('cmd_vel',Twist, r_listener.set_speedcb)
 
 
 
@@ -346,7 +353,7 @@ def main(argv):
 
     #step_size = argv[0]
 
-    n_vehicles = 10
+    n_vehicles = 2
     sumo_node = sumo_spawn(ns = ns, n_vehicles = n_vehicles)
     traci.simulationStep()
     while not rospy.is_shutdown():

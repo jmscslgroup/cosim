@@ -28,6 +28,8 @@ TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
 <launch>
 
 
-    <node pkg="cosim" type="sumo_spawn.py" name="sumo_spawmn" output="screen" required="true"/>
-
+    <node pkg="cosim" type="sumo_spawn.py" name="sumo_spawn" output="screen" required="true"/>
+    <node pkg="sinvel" type="sinvel_node" name="sinvel1" output="screen" required="true"/>
+    <node pkg="vehicle_dual" type="vehicle_dual_node" name="vehicle_dual_name" output="screen" required="true"/>
+    <node name="recorder" pkg="rosbag" type="record" output="screen" args="-o /home/ivory/CyverseData/JmscslgroupData/Bagfiles/cosim/ -a"/>
 </launch>
